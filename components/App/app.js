@@ -1,6 +1,7 @@
 import { Header, Footer } from ".";
 import styles from "../../styles/Home.module.css";
 import { UploadModal, Table } from "..";
+import { permissions } from "../../constants/perms";
 
 export default function App() {
   return (
@@ -8,7 +9,7 @@ export default function App() {
       <Header />
 
       <main className={styles.main}>
-        <UploadModal />
+        <UploadModal permissions={permissions} />
       </main>
 
       <Footer />

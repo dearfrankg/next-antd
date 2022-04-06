@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Modal, Button, Upload, Space, Select } from "antd";
+import { Modal, Button, Upload, Space, Select, message } from "antd";
 import { InboxOutlined } from "@ant-design/icons";
 import { Table } from ".";
 
@@ -7,10 +7,26 @@ const { Option } = Select;
 const { Dragger } = Upload;
 
 const getRender = (fileList, setFileList) => {
+  //
   const handleOnChange = (e, index) => {
     const newState = [...fileList];
     const { name, value } = e.target;
     newState[index][name] = value;
+    setFileList(newState);
+  };
+
+  const handleOnChangeForPermissions = (name, list) => {
+    const newState = fileList.map((file) => {
+      list.forEach((permission) => {
+        file.permissions = Array.isArray(file.permissions) ? file.permissions : [];
+        if (!file.permissions.includes(permission)) {
+          file.permissions = [...file.permissions, permission];
+        }
+      });
+
+      return file;
+    });
+    console.log("newState: ", newState);
     setFileList(newState);
   };
 
@@ -92,20 +108,23 @@ const getRender = (fileList, setFileList) => {
 
     button: (str, uid) => <button onClick={(e) => handleDeleteBtn(uid)}>{str}</button>,
 
-    select: (options) => (
-      <Select
-        mode="multiple"
-        allowClear
-        style={{ width: "100%" }}
-        placeholder="Please select"
-        defaultValue={[]}
-        onChange={() => {}}
-      >
-        {options.map((option) => (
-          <Option key={option}>{option}</Option>
-        ))}
-      </Select>
-    ),
+    select: (name, optionsObject) => {
+      return (
+        <Select
+          mode="multiple"
+          allowClear
+          style={{ width: "100%" }}
+          placeholder="Please select"
+          defaultValue={[]}
+          onChange={(list) => handleOnChangeForPermissions(name, list)}
+          size="small"
+        >
+          {Object.keys(optionsObject).map((option) => (
+            <Option key={optionsObject[option]}>{option}</Option>
+          ))}
+        </Select>
+      );
+    },
 
     files: (fileList) => {
       if (!fileList.length) {
@@ -126,12 +145,12 @@ const getRender = (fileList, setFileList) => {
         {
           title: "Path",
           dataIndex: "path",
-          size: 3
+          size: 5
         },
         {
           title: "Comment",
           dataIndex: "comment",
-          size: 3
+          size: 5
         },
         {
           title: "Remove",
@@ -149,48 +168,64 @@ const getRender = (fileList, setFileList) => {
             inputSize: 300
           }),
 
-          // ext: render.string({
-          //   name: "ext",
-          //   value: file.ext,
-          //   index: fileIndex,
-          //   inputSize: 10
-          // }),
-
           extension: render.text(file.ext),
 
           path: render.string({
             name: "path",
             value: file.path || "",
             index: fileIndex,
-            inputSize: 100
+            inputSize: 180
           }),
 
           comment: render.string({
             name: "comment",
             value: file.comment || "",
             index: fileIndex,
-            inputSize: 100
+            inputSize: 180
           }),
 
           remove: render.button("remove", file.uid)
         };
       });
-      // .map((file, index) => {
-      //   handleOnChange({ target: { name: "baseName", value: file.ext } }, index);
-      //   return file;
-      // });
 
       return (
-        <div style={{ width: 750 }}>
+        <div style={{ width: 900 }}>
           <Table columns={columns} dataSource={data} size="middle" pagination={false} />
         </div>
       );
     },
 
-    permissions: () => {
+    permissions: (props) => {
       if (!fileList.length) {
         return null;
       }
+
+      // create options for reader groups
+      const permissions = {
+        reader: (() => {
+          const obj = {};
+          props.permissions.readerGroups.forEach((group) => {
+            obj[group.name] = `readerGroups-${group.id}`;
+          });
+          return obj;
+        })(),
+
+        editor: (() => {
+          const obj = {};
+          props.permissions.editorGroups.forEach((group) => {
+            obj[group.name] = `editorGroups-${group.id}`;
+          });
+          return obj;
+        })(),
+
+        publisher: (() => {
+          const obj = {};
+          props.permissions.publisherGroups.forEach((group) => {
+            obj[group.name] = `publisherGroups-${group.id}`;
+          });
+          return obj;
+        })()
+      };
 
       const columns = [
         {
@@ -208,53 +243,37 @@ const getRender = (fileList, setFileList) => {
         {
           key: "1",
           permission: "Read",
-          groups: render.select([
-            "Marketing Group",
-            "Design Group",
-            "Management Group",
-            "Developer Group"
-          ])
+          groups: render.select("reader", permissions.reader)
         },
         {
           key: "1",
-          permission: "Write",
-          groups: render.select([
-            "Marketing Group",
-            "Design Group",
-            "Management Group",
-            "Developer Group"
-          ])
+          permission: "Edit",
+          groups: render.select("editor", permissions.editor)
         },
         {
           key: "1",
-          permission: "Delete",
-          groups: render.select([
-            "Marketing Group",
-            "Design Group",
-            "Management Group",
-            "Developer Group"
-          ])
+          permission: "Publish",
+          groups: render.select("publisher", permissions.publisher)
         }
       ];
 
       return (
-        <div style={{ width: 750 }}>
+        <div style={{ width: 900 }}>
           <Table columns={columns} dataSource={data} size="small" pagination={false} />
         </div>
       );
     },
 
     state: (state) => {
-      return (
-        <pre style={{ textAlign: "left", fontSize: 10 }}>{JSON.stringify(state, null, 2)}</pre>
-      );
+      console.log(JSON.stringify(state, null, 2));
+      return null;
     }
   };
 
   return render;
 };
 
-const getModal = (setIsModalVisible) => {
+const getModal = (setIsModalVisible, setFileList) => {
   return {
     show: () => {
       setIsModalVisible(true);
@@ -262,10 +281,13 @@ const getModal = (setIsModalVisible) => {
 
     handleOk: () => {
       setIsModalVisible(false);
+      setFileList([]);
+      message.success("Files uploaded successfully");
     },
 
     handleCancel: () => {
       setIsModalVisible(false);
+      setFileList([]);
     }
   };
 };
@@ -274,7 +296,7 @@ export const UploadModal = (props) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [fileList, setFileList] = useState([]);
 
-  const modal = getModal(setIsModalVisible);
+  const modal = getModal(setIsModalVisible, setFileList);
   const render = getRender(fileList, setFileList);
 
   return (
@@ -294,7 +316,7 @@ export const UploadModal = (props) => {
           <Space direction="vertical" size="large" align="center">
             {render.dragger(setFileList)}
             {render.files(fileList)}
-            {render.permissions()}
+            {render.permissions(props)}
             {render.state(fileList)}
           </Space>
         </div>
